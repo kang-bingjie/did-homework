@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -8,7 +9,7 @@ from docx.document import Document as DocxDocument
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx.oxml.ns import qn, nsmap
 from docx.shared import Cm, Inches, Pt
 
 
@@ -21,6 +22,370 @@ SONG = "宋体"
 FANGSONG = "仿宋"
 HEITI = "黑体"
 TIMES = "Times New Roman"
+
+# ── Math: OMML namespace ───────────────────────────────────────────
+MATH_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+
+# ── Math: Greek letter lookup ──────────────────────────────────────
+GREEK: dict[str, str] = {
+    "alpha": "α", "beta": "β", "gamma": "γ", "delta": "δ",
+    "epsilon": "ε", "varepsilon": "ε", "zeta": "ζ", "eta": "η",
+    "theta": "θ", "iota": "ι", "kappa": "κ", "lambda": "λ",
+    "mu": "μ", "nu": "ν", "xi": "ξ", "pi": "π",
+    "rho": "ρ", "sigma": "σ", "tau": "τ", "upsilon": "υ",
+    "phi": "φ", "varphi": "ϕ", "chi": "χ", "psi": "ψ",
+    "omega": "ω",
+    "Alpha": "Α", "Beta": "Β", "Gamma": "Γ", "Delta": "Δ",
+    "Theta": "Θ", "Lambda": "Λ", "Xi": "Ξ", "Pi": "Π",
+    "Sigma": "Σ", "Upsilon": "Υ", "Phi": "Φ", "Psi": "Ψ",
+    "Omega": "Ω",
+}
+
+# ── Math: operator names that render upright ───────────────────────
+OPERATORS = {"log", "ln", "exp", "sin", "cos", "tan", "lim", "max", "min", "det"}
+
+# ── Math: special symbol translations ──────────────────────────────
+SYMBOLS: dict[str, str] = {
+    "cdot": "·", "times": "×", "div": "÷", "pm": "±",
+    "leq": "≤", "geq": "≥", "neq": "≠", "approx": "≈",
+    "equiv": "≡", "sim": "∼", "propto": "∝",
+    "infty": "∞", "partial": "∂", "nabla": "∇",
+    "rightarrow": "→", "leftarrow": "←", "Rightarrow": "⇒",
+    "in": "∈", "notin": "∉", "subset": "⊂", "subseteq": "⊆",
+    "cup": "∪", "cap": "∩", "forall": "∀", "exists": "∃",
+    "angle": "∠", "parallel": "∥", "perp": "⊥",
+    "prime": "′", "ast": "∗",
+}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# OMML construction helpers
+# ═══════════════════════════════════════════════════════════════════
+
+def _m(tag: str, *children, **attrs) -> OxmlElement:
+    """Create an OMML element. tag is the local part (without 'm:' prefix)."""
+    tag = tag.split(":")[-1]  # strip any existing m: prefix
+    elm = OxmlElement(f"m:{tag}")
+    for k, v in attrs.items():
+        elm.set(k, v)
+    for child in children:
+        if isinstance(child, str):
+            child = _m_run(child)
+        elm.append(child)
+    return elm
+
+
+def _m_run(text: str) -> OxmlElement:
+    """Create <m:r><m:t xml:space="preserve">text</m:t></m:r>."""
+    r = OxmlElement("m:r")
+    t = OxmlElement("m:t")
+    t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    t.text = text
+    r.append(t)
+    return r
+
+
+def _wrap_omath(*children) -> OxmlElement:
+    """Wrap children in <m:oMath>."""
+    omath = OxmlElement("m:oMath")
+    for child in children:
+        omath.append(child)
+    return omath
+
+
+def _wrap_omathpara(*children) -> OxmlElement:
+    """Wrap children in <m:oMathPara>."""
+    op = OxmlElement("m:oMathPara")
+    for child in children:
+        op.append(child)
+    return op
+
+
+# ═══════════════════════════════════════════════════════════════════
+# LaTeX math → OMML parser (simple iterative scanner)
+# ═══════════════════════════════════════════════════════════════════
+
+def _match_braces(s: str, start: int) -> int:
+    """Find the matching '}' for a '{' at position start-1. Returns position of '}'."""
+    depth = 1
+    i = start
+    while i < len(s) and depth > 0:
+        if s[i] == '{':
+            depth += 1
+        elif s[i] == '}':
+            depth -= 1
+        i += 1
+    if depth != 0:
+        raise ValueError(f"Unmatched brace in: {s}")
+    return i - 1  # position of matching '}'
+
+
+def _parse_latex_arg(s: str, start: int) -> tuple[str, int]:
+    """Parse a LaTeX argument at start. Returns (content, new_pos).
+    If s[start] == '{', content is inside braces. Otherwise single char."""
+    if start >= len(s):
+        return "", start
+    if s[start] == '{':
+        end = _match_braces(s, start + 1)
+        return s[start + 1:end], end + 1
+    return s[start], start + 1
+
+
+def latex_to_omml(latex: str) -> OxmlElement:
+    """Convert a LaTeX math string to an <m:oMath> element.
+    
+    Uses a simple iterative scan with manual subscript/superscript attachment.
+    """
+    return _build_omath(_scan_latex(latex))
+
+
+def _scan_latex(s: str) -> list[OxmlElement]:
+    """Scan LaTeX math string and return a flat list of OMML elements.
+    
+    Subscripts/superscripts are returned as marker elements (m:submark, m:supmark)
+    that _build_omath will attach to their preceding base.
+    """
+    result: list[OxmlElement] = []
+    i = 0
+    n = len(s)
+    
+    while i < n:
+        ch = s[i]
+        
+        # ── Subscript _ ──────────────────────────────────────────
+        if ch == '_':
+            i += 1
+            arg_text, i = _parse_latex_arg(s, i)
+            sub_children = _scan_latex(arg_text)
+            marker = OxmlElement("m:submark")
+            for c in sub_children:
+                marker.append(c)
+            result.append(marker)
+            continue
+        
+        # ── Superscript ^ ────────────────────────────────────────
+        if ch == '^':
+            i += 1
+            arg_text, i = _parse_latex_arg(s, i)
+            sup_children = _scan_latex(arg_text)
+            marker = OxmlElement("m:supmark")
+            for c in sup_children:
+                marker.append(c)
+            result.append(marker)
+            continue
+        
+        # ── LaTeX command \... ───────────────────────────────────
+        if ch == '\\':
+            i += 1
+            # Read command name
+            cmd_start = i
+            while i < n and s[i].isalpha():
+                i += 1
+            cmd = s[cmd_start:i]
+            
+            if cmd in GREEK:
+                result.append(_m_run(GREEK[cmd]))
+            elif cmd in SYMBOLS:
+                result.append(_m_run(SYMBOLS[cmd]))
+            elif cmd in OPERATORS:
+                # \log, \exp, \ln → m:func
+                fname = _m("fName", _m_run(cmd))
+                # Parse argument
+                if i < n and s[i] in ('{', '('):
+                    if s[i] == '(':
+                        # consume until matching )
+                        j = i + 1
+                        depth = 1
+                        while j < n and depth > 0:
+                            if s[j] == '(': depth += 1
+                            elif s[j] == ')': depth -= 1
+                            j += 1
+                        arg_text = s[i+1:j-1]
+                        i = j
+                    else:
+                        arg_text, i = _parse_latex_arg(s, i)
+                    arg_children = _build_omath_inline(_scan_latex(arg_text))
+                    func_el = _m("func", fname, _m("e", *arg_children))
+                else:
+                    func_el = _m("func", fname, _m("e"))
+                result.append(func_el)
+            elif cmd == 'frac':
+                num_text, i = _parse_latex_arg(s, i)
+                den_text, i = _parse_latex_arg(s, i)
+                num_kids = _scan_latex(num_text)
+                den_kids = _scan_latex(den_text)
+                result.append(_m("f", _m("num", *num_kids), _m("den", *den_kids)))
+            elif cmd == 'sqrt':
+                arg_text, i = _parse_latex_arg(s, i)
+                kids = _scan_latex(arg_text)
+                result.append(_m("rad", _m("e", *kids)))
+            elif cmd in ('left', 'right'):
+                # Skip \left( and \right) — just consume the delimiter
+                if i < n:
+                    i += 1
+            elif cmd in ('begin', 'end', 'label', 'nonumber'):
+                if i < n and s[i] == '{':
+                    _, i = _parse_latex_arg(s, i)
+            elif cmd == 'text' or cmd == 'texttt':
+                arg_text, i = _parse_latex_arg(s, i)
+                result.append(_m_run(arg_text))
+            else:
+                result.append(_m_run(cmd))
+            continue
+        
+        # ── Special characters ───────────────────────────────────
+        if ch == '\'':
+            result.append(_m_run('′'))  # U+2032 prime
+            i += 1
+            continue
+        
+        if ch in ('{', '}'):
+            i += 1  # skip stray braces
+            continue
+        
+        if ch in ('(', ')', '[', ']', '=', '+', '-', ',', '|', ':', ' '):
+            result.append(_m_run(ch))
+            i += 1
+            continue
+        
+        # ── Plain text run ───────────────────────────────────────
+        j = i
+        while j < n and s[j] not in ('_', '^', '\\', '\'', '{', '}',
+                                       '(', ')', '[', ']', '=', '+', '-',
+                                       ',', '|', ':', ' '):
+            j += 1
+        if j > i:
+            result.append(_m_run(s[i:j]))
+            i = j
+            continue
+        
+        i += 1  # fallback
+    
+    return result
+
+
+def _build_omath_inline(elements: list[OxmlElement]) -> list[OxmlElement]:
+    """Like _build_omath but returns element list for nesting."""
+    result: list[OxmlElement] = []
+    
+    for el in elements:
+        tag = el.tag.split('}')[-1] if '}' in el.tag else el.tag
+        
+        if tag == 'submark':
+            if not result:
+                continue
+            base = result.pop()
+            ssub = OxmlElement("m:sSub")
+            ssub.append(_m("e", base))
+            ssub.append(_m("sub", *list(el)))
+            result.append(ssub)
+        elif tag == 'supmark':
+            if not result:
+                continue
+            base = result.pop()
+            ssup = OxmlElement("m:sSup")
+            ssup.append(_m("e", base))
+            ssup.append(_m("sup", *list(el)))
+            result.append(ssup)
+        else:
+            result.append(el)
+    
+    # Combine adjacent sSub + sSup → sSubSup
+    merged: list[OxmlElement] = []
+    i = 0
+    while i < len(result):
+        el = result[i]
+        tag = el.tag.split('}')[-1] if '}' in el.tag else el.tag
+        
+        if tag == 'sSub' and i + 1 < len(result):
+            next_tag = result[i+1].tag.split('}')[-1] if '}' in result[i+1].tag else result[i+1].tag
+            if next_tag == 'sSup':
+                sub_el = result[i]
+                sup_el = result[i+1]
+                base = sub_el.find(qn('m:e'))
+                sub = sub_el.find(qn('m:sub'))
+                sup = sup_el.find(qn('m:sup'))
+                ssubsup = OxmlElement("m:sSubSup")
+                if base is not None:
+                    ssubsup.append(base)
+                if sub is not None:
+                    ssubsup.append(sub)
+                if sup is not None:
+                    ssubsup.append(sup)
+                merged.append(ssubsup)
+                i += 2
+                continue
+        
+        merged.append(el)
+        i += 1
+    
+    return merged
+
+
+def _build_omath(elements: list[OxmlElement]) -> OxmlElement:
+    """Post-process: attach submark/supmark markers to preceding elements."""
+    omath = OxmlElement("m:oMath")
+    processed = _build_omath_inline(elements)
+    for el in processed:
+        omath.append(el)
+    return omath
+
+
+def add_inline_math(paragraph, latex: str, size: float = 10.5) -> None:
+    """Insert an inline OMML equation into a paragraph."""
+    omath = latex_to_omml(latex)
+    run = paragraph.add_run()
+    run.font.size = Pt(size)
+    run._element.append(omath)
+
+
+def add_display_equation(doc: DocxDocument, latex: str) -> None:
+    """Add a centered display equation paragraph."""
+    paragraph = doc.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.space_before = Pt(6)
+    paragraph.paragraph_format.space_after = Pt(6)
+
+    omath = latex_to_omml(latex)
+    ompara = _wrap_omathpara(_wrap_omath(*list(omath)))
+    # ompara is the full <m:oMathPara> containing the equation
+    paragraph._element.append(ompara)
+
+
+def add_body_paragraph_with_math(doc: DocxDocument, text: str) -> None:
+    """Add a body paragraph, rendering $...$ as inline OMML equations."""
+    paragraph = doc.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    set_paragraph_format(paragraph)
+
+    # Split on $...$ boundaries
+    parts = re.split(r"(\$[^$]+\$)", text)
+    for part in parts:
+        if part.startswith("$") and part.endswith("$"):
+            math_latex = part[1:-1]
+            add_inline_math(paragraph, math_latex, size=10.5)
+        else:
+            add_mixed_run(paragraph, part, east_asia=SONG, size=10.5)
+
+
+def add_abstract_paragraph_with_math(doc: DocxDocument, head_text: str, head_east_asia: str, head_size: float, body_text: str, body_east_asia: str, body_size: float) -> None:
+    """Add an abstract/keywords paragraph with label in bold + body with inline math."""
+    paragraph = doc.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    paragraph.paragraph_format.line_spacing = Pt(20)
+
+    # Label (bold)
+    head = paragraph.add_run(head_text)
+    set_run_font(head, east_asia=head_east_asia, size=head_size, bold=True)
+
+    # Body with math
+    parts = re.split(r"(\$[^$]+\$)", body_text)
+    for part in parts:
+        if part.startswith("$") and part.endswith("$"):
+            math_latex = part[1:-1]
+            add_inline_math(paragraph, math_latex, size=body_size)
+        else:
+            add_mixed_run(paragraph, part, east_asia=body_east_asia, size=body_size)
 
 
 def set_run_font(run, east_asia: str = SONG, size: float = 10.5, bold: bool = False, italic: bool = False) -> None:
@@ -254,11 +619,13 @@ def build_document() -> None:
     add_body_paragraph(doc, "第二类文献关注双重差分和事件研究方法。Bertrand et al.（2004）指出 DID 推断中序列相关和标准误处理的重要性，因此本文将标准误聚类到企业层面。对于多期处理和动态效应设定，Callaway & Sant’Anna（2021）、Sun & Abraham（2021）和 Goodman-Bacon（2021）提醒研究者注意处理时点异质性和事件研究解释。本文的事件研究图只是合成数据中的识别诊断示范，不构成真实研究中的识别证明。")
 
     add_section_heading(doc, "三、数据与变量")
-    add_body_paragraph(doc, "合成数据覆盖 2016 至 2024 年的企业面板。核心结果变量为企业对数全要素生产率 log(TFPit)。核心解释变量 Digitalit 表示企业是否已经进入数字化转型状态。控制变量包括资本强度、出口份额和所有制变量。处理组企业在 2020 年后进入数字化转型状态，因此该变量同时包含处理组身份和处理后时期信息。")
+    add_body_paragraph_with_math(doc, "合成数据覆盖 2016 至 2024 年的企业面板。核心结果变量为企业对数全要素生产率 $\\log(TFP_{it})$。核心解释变量 $Digital_{it}$ 表示企业是否已经进入数字化转型状态。控制变量包括资本强度、出口份额和所有制变量。处理组企业在 2020 年后进入数字化转型状态，因此该变量同时包含处理组身份和处理后时期信息。")
     add_body_paragraph(doc, "再次强调，样本并不来自真实企业数据库。数据生成过程被设计为服务于现场演示：一方面，它要足够接近经济学论文的分析流程；另一方面，它必须可被 Python、Stata、Matlab、Jupyter 和 LaTeX 共同读取和复现。")
 
     add_section_heading(doc, "四、实证策略")
-    add_body_paragraph(doc, "基准模型为双重差分设定：log(TFPit)=αi+λt+τDigitalit+X′itβ+εit。其中，αi 表示企业固定效应，λt 表示年份固定效应，Xit 包括资本强度、出口份额和所有制控制变量。标准误聚类到企业层面，以反映同一企业内误差项可能存在相关性。")
+    add_body_paragraph_with_math(doc, "基准模型为双重差分设定：")
+    add_display_equation(doc, "\\log(TFP_{it}) = \\alpha_i + \\lambda_t + \\tau Digital_{it} + X_{it}'\\beta + \\varepsilon_{it},")
+    add_body_paragraph_with_math(doc, "其中 $\\alpha_i$ 表示企业固定效应，$\\lambda_t$ 表示年份固定效应，$X_{it}$ 包括资本强度、出口份额和所有制控制变量。标准误聚类到企业层面，以反映同一企业内误差项可能存在相关性。")
     add_body_paragraph(doc, "为了展示动态效应，本文还构造相对采用年份的事件研究变量，并以采用前一年作为基准组。事件研究用于检查处理前系数是否接近零，以及处理后系数是否按模拟设定逐步上升。它是识别诊断，而不是识别假设本身的证明。")
 
     add_section_heading(doc, "五、主要结果")
@@ -274,7 +641,9 @@ def build_document() -> None:
     add_body_paragraph(doc, "安慰剂检验只使用处理前样本，并假设处理组企业在 2018 年已经受到虚假处理。估计结果显示，placebo_digital_2018 的系数约为 0.0015，标准误约为 0.0074，p 值约为 0.835。这说明在合成数据中，处理前没有明显的虚假政策效应。该检验支持工作流中的诊断逻辑，但仍不能替代真实研究中对识别假设的论证。")
 
     add_section_heading(doc, "八、理论机制：AI 采用成本收益模型")
-    add_body_paragraph(doc, "Matlab 部分将数字化转型解释为企业 AI 采用决策。企业 i 的管理能力为 mi，选择 AI 使用强度 xi∈[0,1]。采用 AI 的净收益为 Vi(xi)=(φ+λmi)xi-1/2ψx²i-ci。企业先使用有界优化求解最优强度 x*i，再根据 Vi(x*i) 是否大于零决定是否采用 AI。模型用 Stata DID 估计目标校准参数 φ。校准结果显示，φ 约为 0.8659，模型平均收益约为 0.1209，AI 采用率约为 0.8197。")
+    add_body_paragraph_with_math(doc, "Matlab 部分将数字化转型解释为企业 AI 采用决策。企业 $i$ 的管理能力为 $m_i$，选择 AI 使用强度 $x_i \\in [0,1]$。采用 AI 的净收益为")
+    add_display_equation(doc, "V_i(x_i) = (\\phi + \\lambda m_i)x_i - \\frac{1}{2}\\psi x_i^2 - c_i.")
+    add_body_paragraph_with_math(doc, "企业先使用有界优化求解最优强度 $x_i^*$，再根据 $V_i(x_i^*)$ 是否大于零决定是否采用 AI。模型用 Stata DID 估计目标校准参数 $\\phi$。校准结果显示，$\\phi$ 约为 0.8659，模型平均收益约为 0.1209，AI 采用率约为 0.8197。")
     add_body_paragraph(doc, "图3展示不同管理能力企业的模型预测生产率收益。管理能力较高的企业因为采用成本相对更低、AI 使用回报更高，更容易采用 AI 并获得更高收益。该模型只是机制展示，不是对真实企业行为的结构估计。")
     add_figure(doc, "matlab_theory_model.png", "图3  AI 采用优化模型中的生产率收益")
 
