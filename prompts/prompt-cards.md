@@ -29,22 +29,60 @@
 如果不能，只做最小修改。修改后运行脚本并汇报验证结果。
 ```
 
-## 4. Stata-MCP / fallback
+## 4. Stata-MCP 演示：DID 估计与事件研究
 
 风险等级：中
 
+用途：第二讲现场演示上手操作演示1
+
 ```text
-请用 Stata 跑一个 DID 回归：log_tfp 对 digital，加入 firm_id 和 year 固定效应，标准误聚类到 firm_id。
-同时输出事前平行趋势事件研究和 2018 年虚假处理的安慰剂检验。如果 Stata-MCP 不可用，请检查 scripts/run_stata_did.do 是否能作为 fallback 脚本。
+请帮我用 Stata 完成以下分析，并保存结果到 output/ 文件夹：
+
+1. 读取 data/raw/digital_transformation_firm_panel.csv，确认样本量和变量类型
+2. 生成描述统计：log_tfp、digital 的均值、标准差、样本量
+3. 运行 DID 回归：
+   - 命令：reghdfe log_tfp digital, absorb(firm_id year) vce(cluster firm_id)
+   - 保存回归表到 output/stata_did_results.csv
+4. 生成事件研究图：
+   - 估计处理前后各期相对处理年份的系数
+   - 画出 95% 置信区间
+   - 保存到 output/digital_event_study.png
+5. 汇报：digital 系数、标准误、显著性水平、R²、样本量
+
+注意：这是合成数据演示，结果不能解释为真实企业数字化转型的因果证据。
 ```
 
-## 5. Matlab-MCP / fallback
+## 5. Matlab-MCP 演示：结构模型校准
 
-风险等级：低
+风险等级：中
+
+用途：第二讲现场演示上手操作演示2
 
 ```text
-请检查 scripts/matlab_power_simulation.m 的输出逻辑。它应生成 output/matlab_theory_estimates.csv、output/matlab_productivity_surface.csv 和 output/matlab_theory_model.png。
-如果 Matlab-MCP 不可用，只说明手动运行方式，不要修改系统配置。
+请帮我用 Matlab 完成以下结构模型的数值分析，保存结果到 output/ 文件夹：
+
+数据输入：
+- 读取 ../output/stata_did_results.csv 第一行的估计系数，作为目标效应 target_effect
+
+模型设定：
+- 企业管理能力 m_i 在 [-1.5, 1.5] 均匀分布，61 个格点
+- 成本函数：c_i = 0.06 + 0.10 * max(-m_i, 0)
+- 收益参数：psi = 1.8（凸性成本），lambda = 0.12（能力互补）
+- 净收益：V_i(x_i) = (phi + lambda * m_i) * x_i - 0.5 * psi * x_i^2 - c_i
+
+任务：
+1. 对代表企业（m = 0.5），用 fminbnd 求解最优强度 x* ∈ [0,1]，假设 phi = 0.35
+2. 校准 phi：找到使 mean(max(V_i(x_i*), 0)) = target_effect 的 phi 值
+   - 提示：用 fminbnd 最小化 (mean(gain) - target_effect)^2
+3. 用校准后的 phi 计算每个企业的最优强度、采用决策、生产率增益
+4. 画图：X 轴为管理能力 m_i，Y 轴为生产率增益
+   - 用不同颜色标记"采用 AI"和"不采用 AI"的企业
+   - 画 y = 0 参考线
+   - 标题："AI Adoption Choice and Productivity Gain"
+   - 保存到 output/matlab_model_calibration.png
+5. 汇报：校准后的 phi、AI 采用率、平均生产率增益
+
+注意：这是合成数据演示，模型仅用于展示结构估计工作流。
 ```
 
 ## 6. 结果段落

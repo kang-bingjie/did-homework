@@ -14580,6 +14580,7 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
 <h1 id="Stata-Notebook%EF%BC%9A%E6%95%B0%E5%AD%97%E5%8C%96%E8%BD%AC%E5%9E%8B%E4%B8%8E%E4%BC%81%E4%B8%9A%E7%94%9F%E4%BA%A7%E7%8E%87">Stata Notebook&#65306;&#25968;&#23383;&#21270;&#36716;&#22411;&#19982;&#20225;&#19994;&#29983;&#20135;&#29575;<a class="anchor-link" href="#Stata-Notebook%EF%BC%9A%E6%95%B0%E5%AD%97%E5%8C%96%E8%BD%AC%E5%9E%8B%E4%B8%8E%E4%BC%81%E4%B8%9A%E7%94%9F%E4%BA%A7%E7%8E%87">&#182;</a></h1><p>这份 notebook 面向 Stata kernel 展示与调试。它围绕合成企业面板数据完成 DID 估计、事前平行趋势展示和安慰剂检验。若现场 Stata kernel 不可用，可直接运行 <code>scripts/run_stata_did.do</code>。</p>
+<p>$x+y = f(z)$</p>
 
 </div>
 </div>
@@ -14589,7 +14590,7 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[2]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[3]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="k">clear</span> all<span class="k"></span>
@@ -14599,6 +14600,9 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 import delimited <span class="s">"</span><span class="nv">`data_file'</span><span class="s">"</span>,<span class="k"> clear</span>
 <span class="k">xtset</span> firm_id year<span class="k"></span>
 <span class="k">summarize</span> log_tfp digital firm_size capital_intensity export_share
+
+<span class="c1">//进行更细致的统计描述，包括不同分位数</span>
+<span class="k">tabstat</span> log_tfp
 </pre></div>
 
      </div>
@@ -14641,6 +14645,12 @@ Panel variable: firm_id (strongly balanced)
    firm_size |      3,240    30.31659    14.71016   6.193758   151.4245
 capital_in~y |      3,240    .5493285     .113609   .1643652   .9033478
 export_share |      3,240    .2840108    .1632525   .0134397   .7702984
+
+
+    Variable |      Mean
+-------------+----------
+     log_tfp |  1.811908
+------------------------
 </pre>
 </div>
 </div>
@@ -14666,7 +14676,7 @@ export_share |      3,240    .2840108    .1632525   .0134397   .7702984
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[7]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[3]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="c1">//估计双重差分模型</span>
@@ -14693,17 +14703,6 @@ export_share |      3,240    .2840108    .1632525   .0134397   .7702984
 
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
 <pre>note: export_share omitted because of collinearity.
-
-Fixed-effects (within) regression               Number of obs     =      3,240
-Group variable: firm_id                         Number of groups  =        360
-
-R-squared:                                      Obs per group:
-     Within  = 0.7726                                         min =          9
-     Between = 0.0316                                         avg =        9.0
-     Overall = 0.1579                                         max =          9
-
-                                                F(11, 2869)       =     886.37
-corr(u_i, Xb) = 0.0163                          Prob &gt; F          =     0.0000
 
 Fixed-effects (within) regression               Number of obs     =      3,240
 Group variable: firm_id                         Number of groups  =        360
@@ -14754,7 +14753,7 @@ F test that all u_i=0: F(359, 2869) = 157.73                 Prob &gt; F = 0.000
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[5]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[&nbsp;]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="k">label</span> variable log_tfp <span class="s">"Log TFP"</span><span class="k"></span>
@@ -14870,26 +14869,6 @@ Observations &amp; 3240 \\
 R-squared &amp; 0.961 \\
 \bottomrule
 \end{tabular}
-
-\begin{tabular}{lc}
-\toprule
- &amp; Dependent variable: log TFP \\
-\midrule
-Digital transformation &amp; 0.1209*** \\
- &amp; (0.0047) \\
-Capital intensity &amp; 0.0121 \\
- &amp; (0.0155) \\
-Export share &amp; -0.2232*** \\
- &amp; (0.0153) \\
-State-owned enterprise &amp; 0.0360*** \\
- &amp; (0.0031) \\
-\midrule
-Firm fixed effects &amp; Yes \\
-Year fixed effects &amp; Yes \\
-Observations &amp; 3240 \\
-R-squared &amp; 0.961 \\
-\bottomrule
-\end{tabular}
 </pre>
 </div>
 </div>
@@ -14915,7 +14894,7 @@ R-squared &amp; 0.961 \\
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[8]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[4]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="k">forvalues</span> k = <span class="o">-</span><span class="m">4</span><span class="o">/</span><span class="m">4</span> {
@@ -14950,13 +14929,6 @@ R-squared &amp; 0.961 \\
 
 
 note: 359.firm_id omitted because of collinearity.
-note: 360.firm_id omitted because of collinearity.
-
-Linear regression                               Number of obs     =      3,240
-                                                F(16, 359)        =          .
-                                                Prob &gt; F          =          .
-                                                R-squared         =     0.9645
-                                                Root MSE          =     .06082
 note: 360.firm_id omitted because of collinearity.
 
 Linear regression                               Number of obs     =      3,240
@@ -15368,7 +15340,7 @@ capital_int~y |   .0106028   .0145556     0.73   0.467    -.0180222    .0392278
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[9]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[&nbsp;]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="c1">// 生成事件研究图数据，跳过基准期 relative_year = -1</span>
@@ -15437,16 +15409,6 @@ relative_year,estimate,std_error,p_value
 2,0.1190,0.0098,9.53815e-29
 3,0.1694,0.0099,3.84523e-48
 4,0.1974,0.0096,2.15867e-62
-
-relative_year,estimate,std_error,p_value
--4,0.0034,0.0099,.733467
--3,0.0041,0.0095,.665378
--2,0.0108,0.0093,.245136
-0,0.0573,0.0091,7.84603e-10
-1,0.0844,0.0096,6.70319e-17
-2,0.1190,0.0098,9.53815e-29
-3,0.1694,0.0099,3.84523e-48
-4,0.1974,0.0096,2.15867e-62
 </pre>
 </div>
 </div>
@@ -15460,7 +15422,7 @@ relative_year,estimate,std_error,p_value
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[10]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[5]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="c1">// 构建事件研究结果表并绘图</span>
@@ -15517,7 +15479,7 @@ relative_year,estimate,std_error,p_value
 
 
 
-(file /var/folders/l9/dnh5jmfj53q02s7qff8c36r40000gn/T//St50291.000001 not
+(file /var/folders/l9/dnh5jmfj53q02s7qff8c36r40000gn/T//St67928.000001 not
     found)
 </pre>
 </div>
@@ -16194,6 +16156,7 @@ relative_year,estimate,std_error,p_value
 
     format
 
+(file ../output/stata_event_study_ci.png not found)
 file ../output/stata_event_study_ci.png written in PNG format
 
 </pre>
@@ -16241,7 +16204,7 @@ file ../output/stata_event_study_ci.png written in PNG format
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[9]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[&nbsp;]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
 <div class=" highlight hl-stata"><pre><span></span><span class="k">do</span> ..<span class="o">/</span>scripts<span class="o">/</span>run_stata_did<span class="m">.</span>do
