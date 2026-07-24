@@ -19,6 +19,7 @@
 本文使用合成企业面板数据展示一个从实证估计、理论机制到正式写作的经济学研究工作流。实证部分采用双重差分设计，估计数字化转型状态与企业对数全要素生产率之间的关系；理论部分使用 Matlab 构造企业 AI 采用的成本收益优化模型，说明管理能力和采用成本如何影响企业采用 AI 的强度与生产率收益。所有数据均为模拟生成，本文结果仅用于教学和工作流演示，不能解释为真实企业数字化转型的因果证据。该工作流展示了如何将 Stata、Matlab、Jupyter notebook 和 \LaTeX{} 结合起来，形成可复现的科研写作流程。
 
 
+
 \end{abstract}
 
 \noindent\textbf{关键词：} 数字化转型；企业生产率；双重差分；事件研究；AI 采用；合成数据
@@ -39,7 +40,7 @@
 
 第二类文献关注双重差分和事件研究方法。\citet{BertrandDufloMullainathan2004} 指出 DID 推断中序列相关和标准误处理的重要性，因此本文将标准误聚类到企业层面。对于多期处理和动态效应设定，\citet{CallawaySantAnna2021}、\citet{SunAbraham2021} 和 \citet{GoodmanBacon2021} 提醒研究者注意处理时点异质性和事件研究解释。本文的事件研究图只是合成数据中的识别诊断示范，不构成真实研究中的识别证明。
 
-增加一些文献综述 关于数字化转型和生产率的实证研究，例如 \citet{BrynjolfssonHitt2000}、\citet{AutorDorn2013} 和 \citet{Bessen2019}，以及关于企业技术采用决策的理论模型，例如 \citet{Rosenberg1982} 和 \citet{Jovanovic1982}。
+总体而言，现有研究共同表明：技术进步对生产率的作用取决于组织管理、任务重组与采用成本结构，经验识别策略与机制建模需要结合使用，才能更完整地理解企业数字化转型的经济后果。
 
 
 \section{数据与变量}
@@ -47,6 +48,25 @@
 合成数据覆盖 2016 至 2024 年的企业面板。核心结果变量为企业对数全要素生产率 $\log(TFP_{it})$。核心解释变量 $Digital_{it}$ 表示企业是否已经进入数字化转型状态。控制变量包括资本强度、出口份额和所有制变量。处理组企业在 2020 年后进入数字化转型状态，因此该变量同时包含处理组身份和处理后时期信息。
 
 再次强调，样本并不来自真实企业数据库。数据生成过程被设计为服务于现场演示：一方面，它要足够接近经济学论文的分析流程；另一方面，它必须可被 Python、Stata、Matlab、Jupyter 和 \LaTeX{} 共同读取和复现。
+
+表 \ref{tab:descriptives} 报告核心变量的描述统计。\texttt{log\_tfp} 的样本均值约为 1.8119，标准差约为 0.3036；\texttt{digital} 的样本均值约为 0.2330，反映处理状态在全样本中的占比。
+
+\begin{table}[htbp]
+\centering
+\caption{核心变量描述统计}
+\label{tab:descriptives}
+\begin{tabular}{lccc}
+\toprule
+变量 & 均值 & 标准差 & 观测值 \\
+\midrule
+$\log(TFP)$ & 1.8119 & 0.3036 & 3240 \\
+$Digital$ & 0.2330 & 0.4228 & 3240 \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize 注：统计量来自 \texttt{output/stata\_descriptives.csv}。
+\end{flushleft}
+\end{table}
 
 \section{实证策略}
 
@@ -66,7 +86,7 @@
 \centering
 \caption{DID 主估计结果}
 \label{tab:main-results}
-\input{output/stata_regression_table.tex}
+\input{../output/do-test/stata_regression_table.tex}
 \begin{flushleft}
 \footnotesize 注：括号内为聚类到企业层面的标准误。$^{***}$、$^{**}$、$^{*}$ 分别表示在 1\%、5\% 和 10\% 水平上显著。模型控制企业固定效应和年份固定效应。数据为合成数据。
 \end{flushleft}
@@ -74,7 +94,7 @@
 
 \section{动态效应与识别检查}
 
-图 \ref{fig:parallel-trends} 展示处理组与对照组在处理前后的平均趋势。图 \ref{fig:event-study} 展示以处理前一年为基准的事件研究系数和 95\% 置信区间。处理前相对年份 $-4$、$-3$ 和 $-2$ 的系数分别约为 0.0034、0.0041 和 0.0108，均接近零；处理后系数从 0.0573 上升到 0.1974。这一模式符合模拟数据的设计：处理前差异较小，处理后效应逐步增强。
+图 \ref{fig:parallel-trends} 展示处理组与对照组在处理前后的平均趋势。图 \ref{fig:event-study} 展示以处理前一年为基准的事件研究系数和 95\% 置信区间，关键回归系数汇总见表 \ref{tab:event-study}。处理前相对年份 $-4$、$-3$ 和 $-2$ 的系数分别约为 0.0034、0.0041 和 0.0108，均接近零；处理后系数从 0.0573 上升到 0.1974。这一模式符合模拟数据的设计：处理前差异较小，处理后效应逐步增强。
 
 \begin{figure}[htbp]
 \centering
@@ -90,9 +110,48 @@
 \label{fig:event-study}
 \end{figure}
 
+\begin{table}[htbp]
+\centering
+\caption{事件研究关键系数（基准期：处理前一年）}
+\label{tab:event-study}
+\begin{tabular}{ccccc}
+\toprule
+相对年份 & 系数估计 & 标准误 & $t$ 值 & $p$ 值 \\
+\midrule
+$-4$ & 0.0034 & 0.0099 & 0.34 & 0.733 \\
+$-3$ & 0.0041 & 0.0095 & 0.43 & 0.665 \\
+$-2$ & 0.0108 & 0.0093 & 1.16 & 0.245 \\
+$0$  & 0.0573 & 0.0091 & 6.32 & 0.000 \\
+$1$  & 0.0844 & 0.0096 & 8.78 & 0.000 \\
+$2$  & 0.1190 & 0.0098 & 12.17 & 0.000 \\
+$3$  & 0.1694 & 0.0099 & 17.04 & 0.000 \\
+$4$  & 0.1974 & 0.0096 & 20.50 & 0.000 \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize 注：结果来自 \texttt{output/stata\_event\_study.csv}。
+\end{flushleft}
+\end{table}
+
 \section{安慰剂检验}
 
-安慰剂检验只使用处理前样本，并假设处理组企业在 2018 年已经受到虚假处理。估计结果显示，\texttt{placebo\_digital\_2018} 的系数约为 0.0015，标准误约为 0.0074，$p$ 值约为 0.835。这说明在合成数据中，处理前没有明显的虚假政策效应。该检验支持工作流中的诊断逻辑，但仍不能替代真实研究中对识别假设的论证。
+安慰剂检验只使用处理前样本，并假设处理组企业在 2018 年已经受到虚假处理。估计结果见表 \ref{tab:placebo}：\texttt{placebo\_digital\_2018} 的系数约为 0.0015，标准误约为 0.0074，$p$ 值约为 0.835。这说明在合成数据中，处理前没有明显的虚假政策效应。该检验支持工作流中的诊断逻辑，但仍不能替代真实研究中对识别假设的论证。
+
+\begin{table}[htbp]
+\centering
+\caption{安慰剂检验结果（仅处理前年份样本）}
+\label{tab:placebo}
+\begin{tabular}{lccccc}
+\toprule
+变量 & 系数估计 & 标准误 & $t$ 值 & $p$ 值 & 观测值 \\
+\midrule
+Placebo\_Digital\_2018 & 0.0015 & 0.0074 & 0.21 & 0.835 & 1440 \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize 注：结果来自 \texttt{output/stata\_placebo\_results.csv}。
+\end{flushleft}
+\end{table}
 
 \section{理论机制：AI 采用成本收益模型}
 
@@ -100,7 +159,31 @@ Matlab 部分将数字化转型解释为企业 AI 采用决策。企业 $i$ 的�
 \begin{equation}
 V_i(x_i) = (\phi + \lambda m_i)x_i - \frac{1}{2}\psi x_i^2 - c_i.
 \end{equation}
-企业先使用有界优化求解最优强度 $x_i^*$，再根据 $V_i(x_i^*)$ 是否大于零决定是否采用 AI。模型用 Stata DID 估计目标校准参数 $\phi$。校准结果显示，$\phi$ 约为 0.8659，模型平均收益约为 0.1209，AI 采用率约为 0.8197。
+企业先使用有界优化求解最优强度 $x_i^*$，再根据 $V_i(x_i^*)$ 是否大于零决定是否采用 AI。模型用 Stata DID 估计目标校准参数 $\phi$。校准结果见表 \ref{tab:theory-calibration}，其中 $\phi$ 约为 0.8659，模型平均收益约为 0.1209，AI 采用率约为 0.8197。
+
+\begin{table}[htbp]
+\centering
+\caption{Matlab 理论模型校准结果}
+\label{tab:theory-calibration}
+\begin{tabular}{lcc}
+\toprule
+参数/统计量 & 符号 & 数值 \\
+\midrule
+目标效应（Stata DID） & Target effect & 0.1209 \\
+生产率基准收益参数 & $\phi$ & 0.8659 \\
+边际收益参数（管理能力） & $\lambda$ & 0.1200 \\
+二次成本参数 & $\psi$ & 1.8000 \\
+固定采用成本 & $c_0$ & 0.0600 \\
+成本敏感系数 & $\kappa$ & 0.1000 \\
+模型平均净收益 & Mean gain & 0.1209 \\
+模型收益标准差 & SD gain & 0.0852 \\
+AI 采用率 & Adoption share & 0.8197 \\
+\bottomrule
+\end{tabular}
+\begin{flushleft}
+\footnotesize 注：结果来自 \texttt{output/matlab\_theory\_estimates.csv}。
+\end{flushleft}
+\end{table}
 
 图 \ref{fig:theory-model} 展示不同管理能力企业的模型预测生产率收益。管理能力较高的企业因为采用成本相对更低、AI 使用回报更高，更容易采用 AI 并获得更高收益。该模型只是机制展示，不是对真实企业行为的结构估计。
 
@@ -124,6 +207,6 @@ V_i(x_i) = (\phi + \lambda m_i)x_i - \frac{1}{2}\psi x_i^2 - c_i.
 本文写作使用了 AI 辅助工具读取 notebook、输出文件和 LaTeX 初稿，并生成中英文论文草稿。研究者保留了合成数据限制、估计对象、聚类标准误、识别诊断和文献核查要求。所有引用均来自 DOI 或 Crossref 可核查条目；未能核查的文献没有进入参考文献列表。LaTeX 源文件通过 XeLaTeX 编译验证，审计记录见项目根目录下的 \texttt{audit-log.md}。
 
 \bibliographystyle{apalike}
-\bibliography{paper/references}
+\bibliography{references}
 
 \end{document}

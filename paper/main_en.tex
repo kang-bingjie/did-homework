@@ -58,7 +58,7 @@ Table \ref{tab:main-results-en} reports the baseline DID estimate. In the synthe
 \centering
 \caption{Baseline DID Estimate}
 \label{tab:main-results-en}
-\input{output/stata_regression_table.tex}
+\input{../output/do-test/stata_regression_table.tex}
 \begin{flushleft}
 \footnotesize Notes: Firm-clustered standard errors are in parentheses. $^{***}$, $^{**}$, and $^{*}$ denote significance at the 1, 5, and 10 percent levels, respectively. The model includes firm and year fixed effects. The data are synthetic.
 \end{flushleft}
@@ -70,7 +70,7 @@ Figure \ref{fig:parallel-trends-en} plots the average pre- and post-adoption tra
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.78\textwidth]{digital_parallel_trends.png}
+\includegraphics[width=0.78\textwidth]{../output/digital_parallel_trends.png}
 \caption{Parallel-trend diagnostic in the synthetic firm panel}
 \label{fig:parallel-trends-en}
 \end{figure}
@@ -89,6 +89,7 @@ The placebo test uses only pre-2020 observations and assigns a fake treatment da
 %Add a section of robustness checks 
 \section{Robustness Checks}
 To further assess the robustness of the baseline estimate, we conduct several additional checks. First, we re-estimate the model using alternative control variables, such as firm age and industry dummies. The coefficient on $Digital_{it}$ remains positive and statistically significant, with a magnitude similar to the baseline. Second, we implement a propensity score matching approach to create a matched sample of treated and control firms based on pre-treatment characteristics. The DID estimate in the matched sample is consistent with the baseline result, suggesting that the findings are not driven by observable differences between treated and control firms. Finally, we test for
+pre-treatment trends and placebo effects using the same event-study and pre-2020 placebo diagnostics reported above.
 
 \section{Mechanism: AI Adoption Cost-Benefit Model}
 
@@ -102,7 +103,7 @@ Figure \ref{fig:theory-model-en} displays the model-implied productivity gain by
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.78\textwidth]{matlab_theory_model.png}
+\includegraphics[width=0.78\textwidth]{../output/matlab_theory_model.png}
 \caption{AI adoption optimization and model-implied productivity gain}
 \label{fig:theory-model-en}
 \end{figure}
@@ -122,6 +123,6 @@ This paper provides a compact demonstration of an economics research workflow li
 The paper draft was generated with AI assistance using the project README, Stata and Matlab notebooks, output tables, figures, and the existing LaTeX draft as inputs. The researcher retained the synthetic-data caveat, the original estimand, the firm-clustered inference, the identification diagnostics, and the mechanism interpretation. References were included only when DOI metadata could be checked through Crossref or publisher DOI resolution. Compilation was verified with XeLaTeX, and the audit record is stored in \texttt{audit-log.md}.
 
 \bibliographystyle{apalike}
-\bibliography{paper/references}
+\bibliography{references}
 
 \end{document}
