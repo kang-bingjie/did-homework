@@ -1,0 +1,45 @@
+数据读取成功！行数： 3240
+变量名： ['firm_id', 'year', 'industry', 'province', 'treated', 'post', 'digital', 'treated_post', 'adoption_year', 'relative_year', 'firm_size', 'capital_intensity', 'export_share', 'soe', 'managerial_capability', 'log_tfp', 'labor_productivity']
+
+==================================================
+DID 主回归结果
+==================================================
+                          PanelOLS Estimation Summary                           
+================================================================================
+Dep. Variable:                log_tfp   R-squared:                        0.1949
+Estimator:                   PanelOLS   R-squared (Between):              0.0379
+No. Observations:                3240   R-squared (Within):               0.3076
+Date:                Mon, Aug 31 2026   R-squared (Overall):              0.0391
+Time:                        12:26:09   Log-likelihood                    4502.6
+Cov. Estimator:             Clustered                                           
+                                        F-statistic:                      347.34
+Entities:                         360   P-value                           0.0000
+Avg Obs:                       9.0000   Distribution:                  F(2,2870)
+Min Obs:                       9.0000                                           
+Max Obs:                       9.0000   F-statistic (robust):             328.55
+                                        P-value                           0.0000
+Time periods:                       9   Distribution:                  F(2,2870)
+Avg Obs:                       360.00                                           
+Min Obs:                       360.00                                           
+Max Obs:                       360.00                                           
+                                                                                
+                                 Parameter Estimates                                 
+=====================================================================================
+                   Parameter  Std. Err.     T-stat    P-value    Lower CI    Upper CI
+-------------------------------------------------------------------------------------
+digital               0.1209     0.0047     25.632     0.0000      0.1117      0.1302
+capital_intensity     0.0121     0.0155     0.7852     0.4324     -0.0182      0.0424
+=====================================================================================
+
+F-test for Poolability: 168.20
+P-value: 0.0000
+Distribution: F(367,2870)
+
+Included effects: Entity, Time
+
+==================================================
+digital 系数摘要
+==================================================
+系数: 0.1209
+标准误: 0.0047
+p值: 0.0000

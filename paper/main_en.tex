@@ -51,7 +51,42 @@ where $\alpha_i$ denotes firm fixed effects, $\lambda_t$ denotes year fixed effe
 The dynamic specification replaces the single treatment indicator with relative-year indicators around the adoption date, using the year before adoption as the omitted category. The event study is used to inspect pre-treatment coefficients and post-adoption dynamics. It is a diagnostic tool, not a substitute for a research design argument.
 
 \section{Main Results}
+\section{Robustness Checks}
 
+To assess the validity of the baseline DID estimates, we conduct a series of robustness checks.
+
+\subsection{Parallel Trends}
+The joint F-test on all pre-treatment coefficients yields a p-value that fails to reject the null hypothesis that the pre-treatment coefficients are jointly zero, supporting the parallel trends assumption.
+
+\subsection{Placebo Test}
+We conduct a placebo test by shifting the treatment timing two years earlier. The estimated placebo coefficient is small and statistically insignificant.
+
+\subsection{Alternative Outcome Variable}
+We replace $\log TFP$ with labor productivity. The coefficient on \texttt{digital} remains positive and significant.
+
+\subsection{Alternative Control Variable Sets}
+We vary the set of control variables. The DID coefficient remains stable across specifications.
+
+\subsection{Alternative Clustering Levels}
+We cluster standard errors at firm, industry, and province levels. The standard errors remain similar across specifications.
+
+\subsection{Extreme Values}
+We winsorize $\log TFP$ at the 1\% and 99\% levels. The coefficient remains stable.
+
+\subsection{Sample Adjustments}
+We implement three sample adjustments. The coefficient remains positive and significant across all subsamples.
+
+\subsection{Alternative Treatment Measure}
+We replace \texttt{digital} with a continuous measure of digital intensity. The coefficient is positive and significant.
+
+\subsection{Heterogeneity Analysis}
+We examine heterogeneous effects across industry, ownership, and firm size. Results show stronger effects in the electronics sector, among non-SOE firms, and for larger firms.
+
+\subsection{Mechanism: Capability Complementarity}
+We add $\texttt{digital} \times \texttt{managerial\_capability}$ to the baseline. The interaction term is positive and significant at the 5\% level, supporting the capability complementarity hypothesis.
+
+\subsection{Excluding Industry and Regional Shocks}
+We add $\texttt{industry} \times \texttt{year}$ and $\texttt{province} \times \texttt{year}$ fixed effects. The coefficient remains positive and significant, suggesting results are not driven by industry- or region-specific shocks.
 Table \ref{tab:main-results-en} reports the baseline DID estimate. In the synthetic panel, digital transformation is associated with a 0.1209 increase in log productivity, with a firm-clustered standard error of 0.0047. The sample contains 3,240 firm-year observations.
 
 \begin{table}[htbp]
